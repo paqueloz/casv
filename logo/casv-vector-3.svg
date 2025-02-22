@@ -31,7 +31,7 @@
      inkscape:window-x="70"
      inkscape:window-y="27"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer-MC3" />
+     inkscape:current-layer="layer1" />
   <defs
      id="defs1">
     <clipPath
@@ -1459,6 +1459,19 @@
     </clipPath>
   </defs>
   <g
+     inkscape:groupmode="layer"
+     id="layer1"
+     inkscape:label="layer-fond"
+     style="display:inline;fill:#3fff00;fill-opacity:1">
+    <rect
+       style="display:none;opacity:0.866299;fill:#3fff00;fill-opacity:1;stroke:#000000;stroke-width:2.43143;stroke-linejoin:round"
+       id="rect1"
+       width="569.01422"
+       height="568.09119"
+       x="-14.053843"
+       y="-15.899946" />
+  </g>
+  <g
      id="layer-MC1"
      transform="translate(-125.082,-294.27588)"
      style="display:inline"
@@ -2425,7 +2438,7 @@
          clip-path="url(#clipPath282)"
          sodipodi:nodetypes="ssscs" />
       <ellipse
-         style="display:inline;opacity:0.866299;fill:#ffffff;stroke:none;stroke-width:5.33291;stroke-linecap:round;fill-opacity:1"
+         style="display:inline;opacity:0.866299;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:5.33291;stroke-linecap:round"
          id="ellipse279"
          cx="279.79916"
          cy="136.49583"
@@ -2446,7 +2459,7 @@
          clip-path="url(#clipPath282)"
          sodipodi:nodetypes="ssscs" />
       <ellipse
-         style="display:inline;opacity:0.866299;fill:#ffffff;stroke:none;stroke-width:5.33291;stroke-linecap:round;fill-opacity:1"
+         style="display:inline;opacity:0.866299;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:5.33291;stroke-linecap:round"
          id="path277"
          cx="279.79916"
          cy="136.49583"
@@ -2603,7 +2616,7 @@
        transform="translate(125.082,294.27588)"
        inkscape:label="path-tribord" />
     <path
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1.0015748;stroke-linecap:butt;stroke-linejoin:round;stroke-opacity:1;stroke-dasharray:none"
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1.00157;stroke-linecap:butt;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
        d="m 399.22749,443.34826 c 16.09956,10.38797 28.84623,-0.11352 37.61424,-3.92296 0,0 -13.74489,17.76745 -19.61478,17.53792 -5.86989,-0.22952 -17.99946,-13.61496 -17.99946,-13.61496 z"
        id="path283"
        sodipodi:nodetypes="cczc" />
