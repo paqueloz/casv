@@ -26,6 +26,7 @@ public class PosterGenerator {
         double heightCm    = Double.parseDouble(args[1]);
         double dpi         = Double.parseDouble(args[2]);
         int    gap = Integer.parseInt(args[3]);
+        // not used
         double angle       = Double.parseDouble(args[4]);
         int    thumbW      = Integer.parseInt(args[5]);
 
@@ -43,7 +44,7 @@ public class PosterGenerator {
         List<Logo> logos = loadImages(imagePaths);
 
         String outputFile = "poster.svg";
-        generateSVG2(W, H, widthCm, heightCm, gap, angle, thumbW, logos, outputFile);
+        generateFile(W, H, widthCm, heightCm, gap, angle, thumbW, logos, outputFile);
         System.out.printf("SVG généré : %s  (%d × %d px @ %.0f dpi)%n", outputFile, W, H, dpi);
     }
 
@@ -85,23 +86,22 @@ public class PosterGenerator {
         }
     }
 
-    static void generateSVG2(int W, int H,
+    static void generateFile(int W, int H,
                                double widthCm, double heightCm,
                                int gap, double angle, int thumbW,
                                List<Logo> logos, String outputFile) throws Exception {
 
         try (PrintWriter pw = new PrintWriter(outputFile, "UTF-8")) {
-            generateSVG3(W, H, widthCm, heightCm, gap, angle, thumbW, logos, pw);
+            writeSVG(W, H, widthCm, heightCm, gap, angle, thumbW, logos, pw);
         }
     }
 
-    static void generateSVG3(int W, int H,
+    static void writeSVG(int W, int H,
                              double widthCm, double heightCm,
                              int gap, double angle, int thumbW,
                              List<Logo> logos, Writer writer) throws Exception {
 
         int n = logos.size();
-        int thumbH     = thumbW; // vignettes carrées
 
         // En-tête avec dimensions physiques (cm) et viewBox en pixels
         writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -147,9 +147,11 @@ public class PosterGenerator {
         int imgIdx = 0;
         Logo logo = logos.get(imgIdx);
 
+        int margin = 200; // pour éviter les images collées au bord
+
         // centre de l'image
-        double cx = 400 + (thumbW * logo.expand / 2);
-        double cy = 400 + (thumbW / 2);
+        double cx = margin + (thumbW * logo.expand / 2);
+        double cy = margin + (thumbW / 2);
 
         while (true) {
 
@@ -171,18 +173,18 @@ public class PosterGenerator {
             cx += thumbW * logo.expand / 2;
 
             // If we exceed the width, move to the next line
-            if (cx + (thumbW * logo.expand / 2) > W) {
+            if (cx + (thumbW * logo.expand / 2) + margin > W) {
                 cx -= W;
                 cx += thumbW * logo.expand / 2;
 
                 // truc pour les images qui dépassent à gauche
-                double restart = 400 + (thumbW * logo.expand / 2);
+                double restart = margin + (thumbW * logo.expand / 2);
                 if (cx < restart) {
                     cx = restart;
                 }
 
                 cy += thumbW + gap;
-                if (cy + (thumbW / 2) > H) {
+                if (cy + (thumbW / 2) + gap > H) {
                     break;
                 }
             }
@@ -206,155 +208,6 @@ public class PosterGenerator {
         //     ix, iy, thumbW*expand, thumbW*expand));
     }
 
-    // -----------------------------------------------------------------------
-    // Génération SVG
-    // -----------------------------------------------------------------------
-
-    static String generateSVG(int W, int H,
-                               double widthCm, double heightCm,
-                               int gap, double angle, int thumbW,
-                               List<Logo> logos) throws Exception {
-        int n = logos.size();
-
-        double cosA = Math.cos(angle);
-        double sinA = Math.sin(angle);
-
-        // ------------------------------------------------------------------
-        // 1. Taille des vignettes
-        //
-        // La longueur d'une ligne traversant le poster (de bord à bord dans
-        // la direction de l'angle) vaut :
-        //   lineLength = |W·cos| + |H·sin|
-        //
-        // On en déduit thumbW tel que (repetitions * n) vignettes tiennent
-        // sur cette longueur. 
-        // Ce n'est plus le cas avec thumbW fixe.
-        // ------------------------------------------------------------------
-        double lineLength = Math.abs(W * cosA) + Math.abs(H * sinA);
-        int thumbH     = thumbW; // vignettes carrées
-
-        // Demi-diagonale de la vignette = marge de sécurité pour rester dans le poster.
-        // Les images sont verticales donc leurs coins sont à (±thumbW/2, ±thumbH/2)
-        // du centre. La distance max au centre est la demi-diagonale.
-        double halfDiag = Math.sqrt(thumbW * thumbW + thumbH * thumbH) / 2.0;
-
-        // ------------------------------------------------------------------
-        // 2. Zone sûre pour les centres des images
-        //
-        // Dans la direction de la ligne : safeLine = lineLength - 2·halfDiag
-        // Dans la direction normale     : safeNormal = normalExtent - 2·halfDiag
-        //   où normalExtent = |W·sin| + |H·cos|
-        // ------------------------------------------------------------------
-        double normalExtent = Math.abs(W * sinA) + Math.abs(H * cosA);
-        double safeLine     = lineLength   - 2 * halfDiag;
-        double safeNormal   = normalExtent - 2 * halfDiag;
-
-        // ------------------------------------------------------------------
-        // 3. Nombre de lignes et espacement
-        //
-        // On veut remplir safeNormal avec des lignes espacées de thumbH.
-        // numLines = round(safeNormal / thumbH) + 1  (pour inclure les deux bords)
-        // ------------------------------------------------------------------
-        int    numLines    = Math.max(1, (int) Math.round(safeNormal / (thumbH+gap)) + 1);
-        double lineSpacing = (numLines > 1) ? safeNormal / (numLines - 1) : 0;
-
-        // ------------------------------------------------------------------
-        // 4. Nombre de vignettes par ligne et espacement sur la ligne
-        // ------------------------------------------------------------------
-        int    thumbsPerLine    = Math.max(1, (int) Math.round(safeLine / (thumbW+gap)) + 1);
-        double lineItemSpacing  = (thumbsPerLine > 1) ? safeLine / (thumbsPerLine - 1) : 0;
-
-        // ------------------------------------------------------------------
-        // 5. Encodage des images – une seule fois chacune
-        // ------------------------------------------------------------------
-        // déjà dans les logo
-
-        // ------------------------------------------------------------------
-        // 6. Construction du SVG
-        // ------------------------------------------------------------------
-        StringBuilder sb = new StringBuilder();
-
-        // En-tête avec dimensions physiques (cm) et viewBox en pixels
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        sb.append(String.format(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\"\n" +
-            "     xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n" +
-            "     width=\"%.4fcm\" height=\"%.4fcm\"\n" +
-            "     viewBox=\"0 0 %d %d\">\n",
-            widthCm, heightCm, W, H));
-
-        // <defs> : un <symbol> par image source (carré unitaire, redimensionné à l'usage)
-        // meet : était slice et les images étaient clippées
-        sb.append("  <defs>\n");
-        for (int i = 0; i < n; i++) {
-            Logo current = logos.get(i);
-            sb.append(String.format(
-                "    <!-- Image source %d : %s -->\n" +
-                "    <symbol id=\"img%d\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\">\n" +
-                "      <image href=\"%s\" x=\"0\" y=\"0\" width=\"%d\" height=\"%d\"\n" +
-                "             preserveAspectRatio=\"xMidYMid meet\"/>\n" +
-                "    </symbol>\n",
-                i, current.imagePath, i, current.toDataURI(), 100, 100));
-        }
-        sb.append("  </defs>\n\n");
-
-        // Fond blanc
-        sb.append(String.format("  <rect width=\"%d\" height=\"%d\" fill=\"white\"/>\n\n", W, H));
-
-        // ------------------------------------------------------------------
-        // 7. Placement des vignettes
-        //
-        // Centre du poster : (cx, cy)
-        // Direction de la ligne  : (cosA, sinA)
-        // Direction normale      : (-sinA, cosA)
-        //
-        // Les centres des lignes sont distribués symétriquement autour du
-        // centre du poster dans la direction normale, de -safeNormal/2 à +safeNormal/2.
-        // Sur chaque ligne, les centres des images sont distribués de
-        // -safeLine/2 à +safeLine/2 dans la direction de la ligne.
-        // ------------------------------------------------------------------
-        double cx = W / 2.0;
-        double cy = H / 2.0;
-        double dx =  cosA, dy =  sinA;  // direction de la ligne
-        double nx = -sinA, ny =  cosA;  // direction normale
-
-        double normalStart = -safeNormal / 2.0;
-        double lineStart   = -safeLine   / 2.0;
-
-        sb.append("  <g>\n");
-
-        for (int line = 0; line < numLines; line++) {
-            double normalOff = (numLines > 1) ? normalStart + line * lineSpacing : 0;
-            double lineCX    = cx + normalOff * nx;
-            double lineCY    = cy + normalOff * ny;
-
-            for (int t = 0; t < thumbsPerLine; t++) {
-                int imgIdx = t % n;  // séquence cyclique
-
-                double alongOff = (thumbsPerLine > 1) ? lineStart + t * lineItemSpacing : 0;
-                double imgCX    = lineCX + alongOff * dx;
-                double imgCY    = lineCY + alongOff * dy;
-
-                // Coin supérieur gauche – images verticales, aucune rotation
-                double ix = imgCX - thumbW / 2.0;
-                double iy = imgCY - thumbH / 2.0;
-
-                double expand = logos.get(imgIdx).expand;
-
-                sb.append(String.format(
-                    "    <use href=\"#img%d\" x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\"/>\n",
-                    imgIdx, ix, iy, thumbW*expand, thumbH*expand));
-                sb.append(String.format(
-                    "    <rect x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\" rx=\"4\" fill=\"none\" stroke=\"blue\" stroke-width=\"2\"/>\n",
-                    ix, iy, thumbW*expand, thumbH*expand));
-    
-            }
-        }
-
-        sb.append("  </g>\n");
-        sb.append("</svg>\n");
-        return sb.toString();
-    }
 
     // -----------------------------------------------------------------------
     // Utilitaires
