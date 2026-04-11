@@ -4,6 +4,10 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Version that generates something quite good with
+ * java PosterGenerator 90 300 200 800 0.3 1350 a.svg b.png c.png
+ */
 public class PosterGenerator {
 
     static int cmToPx(double cm, double dpi) {
@@ -38,24 +42,26 @@ public class PosterGenerator {
 
         List<Logo> logos = loadImages(imagePaths);
 
-        String svg = generateSVG(W, H, widthCm, heightCm, gap, angle, thumbW, logos);
         String outputFile = "poster.svg";
-        Files.writeString(Path.of(outputFile), svg);
+        generateSVG2(W, H, widthCm, heightCm, gap, angle, thumbW, logos, outputFile);
         System.out.printf("SVG généré : %s  (%d × %d px @ %.0f dpi)%n", outputFile, W, H, dpi);
     }
 
     private static List<Logo> loadImages(List<String> imagePaths) {
-        return imagePaths.stream()
-            .map(PosterGenerator::loadImage)
-            .peek(i -> System.out.println(
+        List<Logo> result = new ArrayList<>();
+        for (int index = 0; index < imagePaths.size(); index++) {
+            Logo i = loadImage(imagePaths.get(index), index);
+            result.add(i);
+            System.out.println(
                 "%s width=%d height=%d ratio=%.3f expand=%.3f".formatted(
                     i.imagePath, i.width, i.height, i.aspectRatio, i.expand
                 )
-            ))
-            .toList();
+            );
+        }
+        return result;
     }
 
-    private static Logo loadImage(String imagePath) {
+    private static Logo loadImage(String imagePath, int index) {
         try {
             String mimeType = detectMime(imagePath);
             byte[] bytes = Files.readAllBytes(Path.of(imagePath));
@@ -73,10 +79,131 @@ public class PosterGenerator {
             int height = dimensions[1];
             double aspectRatio = (double) width / height;
             double expand = Math.sqrt(aspectRatio);
-            return new Logo(imagePath, mimeType, b64, width, height, aspectRatio, expand);
+            return new Logo(imagePath, mimeType, b64, width, height, aspectRatio, expand, index);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    static void generateSVG2(int W, int H,
+                               double widthCm, double heightCm,
+                               int gap, double angle, int thumbW,
+                               List<Logo> logos, String outputFile) throws Exception {
+
+        try (PrintWriter pw = new PrintWriter(outputFile, "UTF-8")) {
+            generateSVG3(W, H, widthCm, heightCm, gap, angle, thumbW, logos, pw);
+        }
+    }
+
+    static void generateSVG3(int W, int H,
+                             double widthCm, double heightCm,
+                             int gap, double angle, int thumbW,
+                             List<Logo> logos, Writer writer) throws Exception {
+
+        int n = logos.size();
+        int thumbH     = thumbW; // vignettes carrées
+
+        // En-tête avec dimensions physiques (cm) et viewBox en pixels
+        writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        writer.write(String.format(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"\n" +
+            "     xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n" +
+            "     width=\"%.4fcm\" height=\"%.4fcm\"\n" +
+            "     viewBox=\"0 0 %d %d\">\n",
+            widthCm, heightCm, W, H));
+
+        // <defs> : un <symbol> par image source (carré unitaire, redimensionné à l'usage)
+        // meet : était slice et les images étaient clippées
+        writer.write("  <defs>\n");
+        for (int i = 0; i < n; i++) {
+            Logo current = logos.get(i);
+            writer.write(String.format(
+                "    <!-- Image source %d : %s -->\n" +
+                "    <symbol id=\"img%d\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\">\n" +
+                "      <image href=\"%s\" x=\"0\" y=\"0\" width=\"%d\" height=\"%d\"\n" +
+                "             preserveAspectRatio=\"xMidYMid meet\"/>\n" +
+                "    </symbol>\n",
+                i, current.imagePath, i, current.toDataURI(), 100, 100));
+        }
+        writer.write("  </defs>\n\n");
+
+        // Fond blanc
+        writer.write(String.format("  <rect width=\"%d\" height=\"%d\" fill=\"white\"/>\n\n", W, H));
+
+        writer.write("  <g>\n");
+
+        // Images
+        placeImages(W, H, gap, angle, thumbW, logos, writer);
+
+        // fin du SVG
+        writer.write("  </g>\n");
+        writer.write("</svg>\n");
+    }
+
+    static void placeImages(int W, int H,
+                            int gap, double angle, int thumbW,
+                            List<Logo> logos, Writer writer) throws Exception {
+
+        int imgIdx = 0;
+        Logo logo = logos.get(imgIdx);
+
+        // centre de l'image
+        double cx = 400 + (thumbW * logo.expand / 2);
+        double cy = 400 + (thumbW / 2);
+
+        while (true) {
+
+            writeImage(cx, cy, thumbW, logo, writer);
+
+            // move right half of current image
+            cx += thumbW * logo.expand / 2;
+            
+            // move right for gap
+            cx += gap;
+
+            imgIdx++;
+            if (imgIdx >= logos.size()) {
+                imgIdx = 0;
+            }
+            logo = logos.get(imgIdx);
+
+            // move right half of next image   
+            cx += thumbW * logo.expand / 2;
+
+            // If we exceed the width, move to the next line
+            if (cx + (thumbW * logo.expand / 2) > W) {
+                cx -= W;
+                cx += thumbW * logo.expand / 2;
+
+                // truc pour les images qui dépassent à gauche
+                double restart = 400 + (thumbW * logo.expand / 2);
+                if (cx < restart) {
+                    cx = restart;
+                }
+
+                cy += thumbW + gap;
+                if (cy + (thumbW / 2) > H) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Place une image, cx, cy sont au centre
+     */
+    static void writeImage(double cx, double cy, int thumbW, Logo logo, Writer writer) throws Exception {
+        double expand = logo.expand;
+        double offset = thumbW * expand / 2;
+        double ix = cx - offset;
+        double iy = cy - offset;
+
+        writer.write(String.format(
+            "    <use href=\"#img%d\" x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\"/>\n",
+            logo.index, ix, iy, thumbW*expand, thumbW*expand));
+        // writer.write(String.format(
+        //     "    <rect x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\" rx=\"4\" fill=\"none\" stroke=\"blue\" stroke-width=\"2\"/>\n",
+        //     ix, iy, thumbW*expand, thumbW*expand));
     }
 
     // -----------------------------------------------------------------------
@@ -306,7 +433,8 @@ public class PosterGenerator {
         int width,
         int height,
         double aspectRatio,
-        double expand
+        double expand,
+        int index
     ) {
         String toDataURI() {
             return "data:" + mimeType + ";base64," + b64;
