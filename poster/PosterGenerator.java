@@ -5,8 +5,18 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
+ * <p>
  * Version that generates something quite good with
- * java PosterGenerator 90 300 200 800 0.3 1350 a.svg b.png c.png
+ * java PosterGenerator 90 300 200 600 300 1500 a.png b.png c.png
+ * and then export as 300 dpi PDF with Inkscape (200 dpi could
+ * be good too but I didn't try...)
+ * </p>
+ * <p>
+ * pngs don't need to be a huge resolution, svg can be embedded
+ * but the result was very pixelated and it seemed a bit complicated
+ * to incorporate cleanly
+ * </p>
+ * 
  */
 public class PosterGenerator {
 
@@ -18,18 +28,19 @@ public class PosterGenerator {
         if (args.length < 7) {
             System.err.println(
                 "Usage: java PosterGenerator <widthCm> <heightCm> <dpi> " +
-                "<gap> <angleRad> <thumbW> <img1> [img2 ...]");
+                "<gapH> <gapV> <thumbW> <img1> [img2 ...]");
             System.exit(1);
         }
 
         double widthCm     = Double.parseDouble(args[0]);
         double heightCm    = Double.parseDouble(args[1]);
         double dpi         = Double.parseDouble(args[2]);
-        int    gap = Integer.parseInt(args[3]);
-        // not used
-        double angle       = Double.parseDouble(args[4]);
-        int    thumbW      = Integer.parseInt(args[5]);
-
+        int    gapH = Integer.parseInt(args[3]); // horizontal gap in pixels
+        int    gapV = Integer.parseInt(args[4]); // vertical gap in pixels
+        int    thumbW      = Integer.parseInt(args[5]); // width and height in pixels
+                                                        // only indicative as narrow
+                                                        // images will be expanded to
+                                                        // occupy similar area
         List<String> imagePaths = new ArrayList<>();
         for (int i = 6; i < args.length; i++) imagePaths.add(args[i]);
 
@@ -38,13 +49,13 @@ public class PosterGenerator {
             System.exit(1);
         }
 
-        int W = cmToPx(widthCm, dpi);
-        int H = cmToPx(heightCm, dpi);
+        int W = cmToPx(widthCm, dpi);    // width in pixels
+        int H = cmToPx(heightCm, dpi);   // height in pixels
 
         List<Logo> logos = loadImages(imagePaths);
 
         String outputFile = "poster.svg";
-        generateFile(W, H, widthCm, heightCm, gap, angle, thumbW, logos, outputFile);
+        generateFile(W, H, widthCm, heightCm, gapH, gapV, thumbW, logos, outputFile);
         System.out.printf("SVG généré : %s  (%d × %d px @ %.0f dpi)%n", outputFile, W, H, dpi);
     }
 
@@ -88,17 +99,17 @@ public class PosterGenerator {
 
     static void generateFile(int W, int H,
                                double widthCm, double heightCm,
-                               int gap, double angle, int thumbW,
+                               int gapH, int gapV, int thumbW,
                                List<Logo> logos, String outputFile) throws Exception {
 
         try (PrintWriter pw = new PrintWriter(outputFile, "UTF-8")) {
-            writeSVG(W, H, widthCm, heightCm, gap, angle, thumbW, logos, pw);
+            writeSVG(W, H, widthCm, heightCm, gapH, gapV, thumbW, logos, pw);
         }
     }
 
     static void writeSVG(int W, int H,
                              double widthCm, double heightCm,
-                             int gap, double angle, int thumbW,
+                             int gapH, int gapV, int thumbW,
                              List<Logo> logos, Writer writer) throws Exception {
 
         int n = logos.size();
@@ -133,7 +144,7 @@ public class PosterGenerator {
         writer.write("  <g>\n");
 
         // Images
-        placeImages(W, H, gap, angle, thumbW, logos, writer);
+        placeImages(W, H, gapH, gapV, thumbW, logos, writer);
 
         // fin du SVG
         writer.write("  </g>\n");
@@ -141,7 +152,7 @@ public class PosterGenerator {
     }
 
     static void placeImages(int W, int H,
-                            int gap, double angle, int thumbW,
+                            int gapH, int gapV, int thumbW,
                             List<Logo> logos, Writer writer) throws Exception {
 
         int imgIdx = 0;
@@ -160,8 +171,8 @@ public class PosterGenerator {
             // move right half of current image
             cx += thumbW * logo.expand / 2;
             
-            // move right for gap
-            cx += gap;
+            // move right for gapH
+            cx += gapH;
 
             imgIdx++;
             if (imgIdx >= logos.size()) {
@@ -183,8 +194,8 @@ public class PosterGenerator {
                     cx = restart;
                 }
 
-                cy += thumbW + gap;
-                if (cy + (thumbW / 2) + gap > H) {
+                cy += thumbW + gapV;
+                if (cy + (thumbW / 2) + gapV > H) {
                     break;
                 }
             }
