@@ -8,6 +8,8 @@ import java.util.regex.Pattern;
  * <p>
  * Version that generates something quite good with
  * java PosterGenerator 90 300 200 600 300 1500 a.png b.png c.png
+ * or
+ * java PosterGenerator 90 300 300 500 300 3000 b.png c.png a.png
  * and then export as 300 dpi PDF with Inkscape (200 dpi could
  * be good too but I didn't try...)
  * </p>
